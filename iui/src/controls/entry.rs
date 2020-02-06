@@ -20,6 +20,7 @@ pub trait NumericEntry {
 pub trait TextEntry {
     fn value(&self, ctx: &UI) -> String;
     fn set_value(&mut self, ctx: &UI, value: &str);
+    fn set_readonly(&mut self, ctx: &UI, readonly: i32);
     fn on_changed<'ctx, F: FnMut(String) + 'ctx>(&mut self, ctx: &'ctx UI, callback: F);
 }
 
@@ -161,6 +162,10 @@ impl TextEntry for Entry {
         unsafe { ui_sys::uiEntrySetText(self.uiEntry, cstring.as_ptr()) }
     }
 
+    fn set_readonly(&mut self, _ctx: &UI, value: i32) {
+        unsafe { ui_sys::uiEntrySetReadOnly(self.uiEntry, value) }
+    }
+
     fn on_changed<'ctx, F: FnMut(String) + 'ctx>(&mut self, _ctx: &'ctx UI, callback: F) {
         unsafe {
             let mut data: Box<Box<FnMut(String)>> = Box::new(Box::new(callback));
@@ -191,6 +196,10 @@ impl TextEntry for PasswordEntry {
                 .to_string_lossy()
                 .into_owned()
         }
+    }
+
+    fn set_readonly(&mut self, _ctx: &UI, value: i32) {
+        unsafe { ui_sys::uiEntrySetReadOnly(self.uiEntry, value) }
     }
     fn set_value(&mut self, _ctx: &UI, value: &str) {
         let cstring = CString::new(value.as_bytes().to_vec()).unwrap();
@@ -231,6 +240,10 @@ impl TextEntry for MultilineEntry {
     fn set_value(&mut self, _ctx: &UI, value: &str) {
         let cstring = CString::new(value.as_bytes().to_vec()).unwrap();
         unsafe { ui_sys::uiMultilineEntrySetText(self.uiMultilineEntry, cstring.as_ptr()) }
+    }
+
+    fn set_readonly(&mut self, _ctx: &UI, value: i32) {
+        unsafe { ui_sys::uiMultilineEntrySetReadOnly(self.uiMultilineEntry, value) }
     }
 
     fn on_changed<'ctx, F: FnMut(String) + 'ctx>(&mut self, _ctx: &'ctx UI, callback: F) {
@@ -359,7 +372,9 @@ impl RadioButtons {
 
     pub fn append(&self, _ctx: &UI, name: &str) {
         let c_string = CString::new(name.as_bytes().to_vec()).unwrap();
-        unsafe { ui_sys::uiRadioButtonsAppend(self.uiRadioButtons, c_string.as_ptr()); }
+        unsafe {
+            ui_sys::uiRadioButtonsAppend(self.uiRadioButtons, c_string.as_ptr());
+        }
     }
 
     pub fn selected(&self, _ctx: &UI) -> i32 {
@@ -367,7 +382,9 @@ impl RadioButtons {
     }
 
     pub fn set_selected(&mut self, _ctx: &UI, idx: i32) {
-        unsafe { ui_sys::uiRadioButtonsSetSelected(self.uiRadioButtons, idx); }
+        unsafe {
+            ui_sys::uiRadioButtonsSetSelected(self.uiRadioButtons, idx);
+        }
     }
 
     pub fn on_selected<'ctx, F: FnMut(i32) + 'ctx>(&self, _ctx: &'ctx UI, callback: F) {
