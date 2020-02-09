@@ -7,8 +7,8 @@ use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::mem;
 use std::rc::Rc;
-use std::thread::sleep;
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use controls::Window;
 
@@ -136,10 +136,7 @@ impl UI {
     pub fn queue_main<'ctx, F: FnMut() + 'ctx>(&'ctx self, callback: F) {
         unsafe {
             let mut data: Box<Box<FnMut()>> = Box::new(Box::new(callback));
-            ui_sys::uiQueueMain(
-                None,
-                &mut *data as *mut Box<FnMut()> as *mut c_void,
-            );
+            ui_sys::uiQueueMain(None, &mut *data as *mut Box<FnMut()> as *mut c_void);
             mem::forget(data);
         }
     }
@@ -148,10 +145,7 @@ impl UI {
     pub fn on_should_quit<'ctx, F: FnMut() + 'ctx>(&'ctx self, callback: F) {
         unsafe {
             let mut data: Box<Box<FnMut()>> = Box::new(Box::new(callback));
-            ui_sys::uiOnShouldQuit(
-                None,
-                &mut *data as *mut Box<FnMut()> as *mut c_void,
-            );
+            ui_sys::uiOnShouldQuit(None, &mut *data as *mut Box<FnMut()> as *mut c_void);
             mem::forget(data);
         }
     }
@@ -218,11 +212,27 @@ impl<'s> EventLoop<'s> {
     /// running the callback given with `on_tick` approximately every
     /// `delay` milliseconds.
     pub fn run_delay(&mut self, ctx: &UI, delay_ms: u32) {
-        loop {
-            if !self.next_tick(ctx) {
-                break;
+        if let Some(ref mut c) = self.callback {
+            let delay_ms = delay_ms as u128;
+            let mut t0 = SystemTime::now();
+            'event_loop: loop {
+                for _ in 0..5 {
+                    if !unsafe { ui_sys::uiMainStep(false as c_int) == 1 } {
+                        break 'event_loop;
+                    }
+                }
+                if let Ok(duration) = t0.elapsed() {
+                    if duration.as_millis() >= delay_ms {
+                        c();
+                        t0 = SystemTime::now();
+                    }
+                } else {
+                    t0 = SystemTime::now();
+                }
+                thread::sleep(Duration::from_millis(5));
             }
+        } else {
+            self.run(ctx)
         }
-        sleep(Duration::new(0, delay_ms * 1000000))
     }
 }
